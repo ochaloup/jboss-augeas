@@ -37,3 +37,11 @@ save
 print /augeas//error
 EOF
 
+# clean the output by tidyp if available
+#tidyp -v > /dev/null 2>&1
+#if [ $? -eq 0 ]; then
+#  for I in "$XMLFILE"; do
+#    tidyp -xml -i -q < "$I" > "$I".tmp
+#    mv "$I".tmp "$I"
+#  done
+#fi
