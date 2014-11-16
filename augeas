@@ -30,10 +30,7 @@ fi
 TEMPLATE=`eval "echo \"$(cat $1)\""`
 
  
-augtool -LA -e -b <<EOF
-set /augeas/load/Xml/lens Xml.lns
-set /augeas/load/Xml/incl[2] "$XMLFILE"
-load
+augtool -Aeb -t "Xml.lns incl $XMLFILE" <<EOF
 defvar file "/files${XMLFILE}"
 $TEMPLATE
 save
