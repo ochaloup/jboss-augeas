@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# This scripts aim to run Augeas tool (command agtool) 
+# to change content of specific xml file
+
+# Printing help
+if [ $# -gt 3 ] || [ $# -eq 0 ] || [ "${*/-h}" != "$*" ]; then
+cat << EOF
+usage: $0 path_to_augeas_rules [path_to_xml_file] [file_with_bash_variables_defined]
+  path_to_augeas_rules  path to files with augeas rules but without loading file and setting xml lenses
+                        the loading and saving are done at the end of this script
+                        please, be sure to escape Augeas variables otherwise it will be expanded as bash variables
+  path_to_xml_file  file that will be changed by the augeas processing(rules)
+  file_with_bash_variables_defined  file with variables that will be expanded to path_to_augeas_rules
+  Options:
+  -h Show help options.
+EOF
+fi
+
+# Injecting the variables from third argument
+[ -f "$3" ] && source "$3"
+
+[ -f "$2" ] && XMLFILE=`readlink -f "$2"` || XMLFILE="$2" 
+
+# Variables are 'injected' to Augeas rule template and result put to bash variable
+if ! [ -f "$1" ]; then 
+  echo "Can't find file with Augeas rules '$1'" 
+  exit 1
+fi
+TEMPLATE=`eval "echo \"$(cat $1)\""`
+
+ 
+augtool -LA -e -b <<EOF
+set /augeas/load/Xml/lens Xml.lns
+set /augeas/load/Xml/incl[2] "$XMLFILE"
+load
+defvar file "/files${XMLFILE}"
+$TEMPLATE
+save
+print /augeas//error
+EOF
+
