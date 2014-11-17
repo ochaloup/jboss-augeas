@@ -17,8 +17,12 @@ usage: $0 path_to_augeas_rules [path_to_xml_file] [file_with_bash_variables_defi
 EOF
 fi
 
-# Injecting the variables from third argument
-[ -f "$3" ] && source "$3"
+# Injecting the variables from file at the third argument
+# If variables contains '.' then it's changed for underscore '_'
+if [ -f "$3" ]; then
+  VAR=`cat $3 | sed 's/\./_/g'`
+  eval "$VAR"
+fi
 
 [ -f "$2" ] && XMLFILE=`readlink -f "$2"` || XMLFILE="$2" 
 
