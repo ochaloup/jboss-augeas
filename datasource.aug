@@ -5,7 +5,7 @@ defnode ds \$datasources/datasource[#attribute/pool-name='TestDatasource']
 set \$ds/#attribute/pool-name "TestDatasource"
 set \$ds/#attribute/jndi-name "java:jboss/datasources/TestDatasource"
 set \$ds/#attribute/enabled "true"
-set \$ds/#attribute/enabled "spy"
+set \$ds/#attribute/spy "true"
 
 defnode dsurl \$ds/connection-url
 set \$dsurl/#text "${db_jdbc_url:-jdbc:postgresql://localhost:5432/crashrec}"
