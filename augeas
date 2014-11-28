@@ -1,8 +1,14 @@
 #!/bin/bash
 
-# This scripts aim to run Augeas tool (command agtool)
+# ------------------------------------------------------
+# This scripts aim to run Augeas tool (command augtool)
 # to change content of specific xml file
+# ------------------------------------------------------
 
+
+# -------------------------------------------
+# ---------------- FUNCTIONS ----------------
+# -------------------------------------------
 function usage() {
 cat << EOF
 Usage:
@@ -19,7 +25,32 @@ Usage:
 EOF
 }
 
+# Loading file with augeas rules and running evaluation over the file
+# to inject values of bash variables defined by script or script parameters
+function evalAugeas() {
+  [ "x$1" = "x" ] && echo "No argument of filename specified" && return
+  local LINE
+  while read LINE; do
+    local EVALUATED_LINE=`eval "echo \"${LINE}\""`
+    # comment line (btw. quoting regexp:  http://stackoverflow.com/questions/218156/bash-regex-with-quotes)
+    [[ "$EVALUATED_LINE" =~ `echo "^[ ]*[#]"` ]] && continue
+    # including different file
+    if [[ "$EVALUATED_LINE" =~ `echo "^[ ]*\binclude\b[ ]+(.*)"` ]]; then
+      local MATCH="${BASH_REMATCH[1]}"
+      # possibly looking relatively from directory where this script is placed in
+      [ ! -f "$MATCH" ] && MATCH="$(dirname $([ -L $0 ] && readlink -f $0 || echo $0))/${MATCH}"
+      [ -f "$MATCH" ] && evalAugeas "$MATCH" || >&2 echo "Can't include '$MATCH' as not a file in ruleset '$1'"
+      continue
+    fi
+    # printf is needed to get new lines added on \n
+    printf -v TEMPLATE "${TEMPLATE}${EVALUATED_LINE}\n"
+  done < "$1"
+}
 
+
+# -----------------------------------------------
+# ---------------- SCRIPT ITSELF ----------------
+# -----------------------------------------------
 # Printing help
 [[ "$*" =~ -[-]{0,1}(h|help)( |$) ]] && usage && exit
 [ $# -eq 0 ] && usage && echo " -> No arguments defined" && exit
@@ -32,8 +63,9 @@ AUGEASFILE="$1"
 shift
 # If we are able to touch the file in second argumetn (which is xml to transform)
 # changing it to an absolute path. If not leaving it as it is as. Asterisk notation
-# cound be used (e.g.path/configuration/standalone*.xml)
+# could be used (e.g. /abs/path/configuration/standalone*.xml)
 [ -f "$1" ] && XMLFILE=`readlink -f "$1"` || XMLFILE="$1"
+[[ ! "$XMLFILE" =~ ^/ ]] && echo "Please define the XML file(s) descriptor '$1' as absolute path" && exit
 shift
 VARIABLESFILE=
 [ -f "$1" ] && VARIABLESFILE="$1" && shift
@@ -53,16 +85,14 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Loading file with augeas rules and running evaluation over the file
-# to inject values of bash variables defined by script or script parameters
-# TODO: evaluate ins command manually
-TEMPLATE=`eval "echo \"$(cat \"$AUGEASFILE\")\""`
+# Injecting data from augeas rule file to TEMPLATE var
+# simple way: TEMPLATE=`eval "echo \"$(cat \"$AUGEASFILE\")\""`
+TEMPLATE=
+evalAugeas "$AUGEASFILE"
+echo "$TEMPLATE"
 
-echo $TEMPLATE
-env
-exit
 
- 
+# -- And now let's rock'n'roll with Augeas itself --
 augtool -Aeb -t "Xml.lns incl $XMLFILE" <<EOF
 defvar file "/files${XMLFILE}"
 $TEMPLATE
@@ -70,11 +100,13 @@ save
 print /augeas//error
 EOF
 
-# clean the output by tidyp if available
+
+# Cleaning the output XML file by tidyp if available
 tidyp -v > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-  for I in "$XMLFILE"; do
+  for I in $XMLFILE; do
     tidyp -xml -i -q < "$I" > "$I".tmp
     mv "$I".tmp "$I"
   done
 fi
+
