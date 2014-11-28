@@ -22,6 +22,8 @@ Usage:
   -h Show help options.
   -Dvariable_name=value  Define variable that is used for replacement of data in xml file.
                          This variable will override a value from bash variable file if defined.
+ WARNING: if you run this script against some Augeas script then be sure to escape augeas variables (defvar) by backslash
+          not slashed variables will be handled as bash variables and will be expanded
 EOF
 }
 
@@ -30,7 +32,8 @@ EOF
 function evalAugeas() {
   [ "x$1" = "x" ] && echo "No argument of filename specified" && return
   local LINE
-  while read LINE; do
+  # flag -r tells read not to treat backslashes as escape char
+  while read -r LINE; do
     local EVALUATED_LINE=`eval "echo \"${LINE}\""`
     # comment line (btw. quoting regexp:  http://stackoverflow.com/questions/218156/bash-regex-with-quotes)
     [[ "$EVALUATED_LINE" =~ `echo "^[ ]*[#]"` ]] && continue
@@ -89,7 +92,7 @@ done
 # simple way: TEMPLATE=`eval "echo \"$(cat \"$AUGEASFILE\")\""`
 TEMPLATE=
 evalAugeas "$AUGEASFILE"
-echo "$TEMPLATE"
+[ "$DEBUG" = true ] || [ "$debug" = true ] && echo "$TEMPLATE"
 
 
 # -- And now let's rock'n'roll with Augeas itself --
