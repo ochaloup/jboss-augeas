@@ -1,37 +1,66 @@
 #!/bin/bash
 
-# This scripts aim to run Augeas tool (command agtool) 
+# This scripts aim to run Augeas tool (command agtool)
 # to change content of specific xml file
 
-# Printing help
-if [ $# -gt 3 ] || [ $# -eq 0 ] || [ "${*/-h}" != "$*" ]; then
+function usage() {
 cat << EOF
-usage: $0 path_to_augeas_rules [path_to_xml_file] [file_with_bash_variables_defined]
-  path_to_augeas_rules  path to files with augeas rules but without loading file and setting xml lenses
-                        the loading and saving are done at the end of this script
-                        please, be sure to escape Augeas variables otherwise it will be expanded as bash variables
-  path_to_xml_file  file that will be changed by the augeas processing(rules)
-  file_with_bash_variables_defined  file with variables that will be expanded to path_to_augeas_rules
-  Options:
+Usage:
+`basename $0` path_to_augeas_rules path_to_xml [file_with_bash_variables] [OPTIONS]
+  path_to_augeas_rules       path to files with augeas rules but without loading file and setting xml lenses
+                             the loading and saving are done at the end of this script
+                             please, be sure to escape Augeas variables otherwise it will be expanded as bash variables
+  path_to_xml                file that will be changed by the augeas processing(rules)
+  file_with_bash_variables   file with variables that will be expanded to path_to_augeas_rules
+ Options:
   -h Show help options.
+  -Dvariable_name=value  Define variable that is used for replacement of data in xml file.
+                         This variable will override a value from bash variable file if defined.
 EOF
-fi
+}
 
-# Injecting the variables from file at the third argument
+
+# Printing help
+[[ "$*" =~ -[-]{0,1}(h|help)( |$) ]] && usage && exit
+[ $# -eq 0 ] && usage && echo " -> No arguments defined" && exit
+[[ "$1" =~ ^- ]] || [ "$2" = "" ] || [[ "$2" =~ ^- ]] && usage \
+   && echo " -> First two arguments are obligatory to be paths to files" && exit
+! [ -f "$1" ] && usage && echo " -> Can't find file '$1' that should contain augeas rules" && exit
+
+
+AUGEASFILE="$1"
+shift
+# If we are able to touch the file in second argumetn (which is xml to transform)
+# changing it to an absolute path. If not leaving it as it is as. Asterisk notation
+# cound be used (e.g.path/configuration/standalone*.xml)
+[ -f "$1" ] && XMLFILE=`readlink -f "$1"` || XMLFILE="$1"
+shift
+VARIABLESFILE=
+[ -f "$1" ] && VARIABLESFILE="$1" && shift
+
+# Injecting the variables from file in the third argument
 # If variables contains '.' then it's changed for underscore '_'
-if [ -f "$3" ]; then
-  VAR=`cat $3 | sed 's/\./_/g'`
-  eval "$VAR"
+if [ -f "$VARIABLESFILE" ]; then
+  VARS=`cat "$VARIABLESFILE" | sed 's/\./_/g'`
+  eval "$VARS"
 fi
 
-[ -f "$2" ] && XMLFILE=`readlink -f "$2"` || XMLFILE="$2" 
+# Parsing variables defined as script options
+while [ $# -gt 0 ]; do
+  VAR=${1#-D}
+  VAR=`echo $VAR | sed 's/\./_/g'`
+  eval $VAR
+  shift
+done
 
-# Variables are 'injected' to Augeas rule template and result put to bash variable
-if ! [ -f "$1" ]; then 
-  echo "Can't find file with Augeas rules '$1'" 
-  exit 1
-fi
-TEMPLATE=`eval "echo \"$(cat $1)\""`
+# Loading file with augeas rules and running evaluation over the file
+# to inject values of bash variables defined by script or script parameters
+# TODO: evaluate ins command manually
+TEMPLATE=`eval "echo \"$(cat \"$AUGEASFILE\")\""`
+
+echo $TEMPLATE
+env
+exit
 
  
 augtool -Aeb -t "Xml.lns incl $XMLFILE" <<EOF
@@ -42,10 +71,10 @@ print /augeas//error
 EOF
 
 # clean the output by tidyp if available
-#tidyp -v > /dev/null 2>&1
-#if [ $? -eq 0 ]; then
-#  for I in "$XMLFILE"; do
-#    tidyp -xml -i -q < "$I" > "$I".tmp
-#    mv "$I".tmp "$I"
-#  done
-#fi
+tidyp -v > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+  for I in "$XMLFILE"; do
+    tidyp -xml -i -q < "$I" > "$I".tmp
+    mv "$I".tmp "$I"
+  done
+fi
