@@ -1,9 +1,9 @@
 defvar datasources \$file/server/profile/subsystem[#attribute/xmlns=~regexp('.*datasources.*')]/datasources
 
 # <datasource jndi-name="java:jboss/datasources/TestDatasource" pool-name="TestDatasource" enabled="true" spy="true">
-defnode ds \$datasources/datasource[#attribute/pool-name='TestDatasource']
+defnode ds \$datasources/datasource[#attribute/pool-name='${datasource:-TestDatasource}']
 set \$ds/#attribute/pool-name "TestDatasource"
-set \$ds/#attribute/jndi-name "java:jboss/datasources/TestDatasource"
+set \$ds/#attribute/jndi-name "java:jboss/datasources/${datasource:-TestDatasource}"
 set \$ds/#attribute/enabled "true"
 set \$ds/#attribute/spy "true"
 
