@@ -30,11 +30,11 @@ EOF
 # Parsing variables defined as script options
 function parseVariables() {
   PARSED_VARIABLES=0
-  while [ $# -gt 0 ] && [[ "$1" =~ ^-D ]]; do
+  while [ $# -gt 0 ] && [[ "$1" =~ ^-D([^=]+)=(.*) ]]; do
     [ "$DEBUG" = true ] || [ "$debug" = true ] && echo "parsing $1"
-    VAR=${1#-D}
-    VAR=`echo $VAR | sed 's/\./_/g'`
-    eval $VAR
+    VAR_NAME=`echo ${BASH_REMATCH[1]} | sed 's/\./_/g'`
+    VAR_VALUE="${BASH_REMATCH[2]}"
+    eval "${VAR_NAME}=${VAR_VALUE}"
     shift
     PARSED_VARIABLES=$(($PARSED_VARIABLES+1))
   done
@@ -67,6 +67,7 @@ function evalAugeas() {
 # -----------------------------------------------
 # ---------------- SCRIPT ITSELF ----------------
 # -----------------------------------------------
+[ "$DEBUG" = true ] || [ "$debug" = true ] && echo "Calling: $0 $@"
 # Taking off variables defined right after the script name
 # variable means '-Dname=value'
 parseVariables "$@"
