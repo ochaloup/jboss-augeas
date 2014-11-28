@@ -27,6 +27,19 @@ Usage:
 EOF
 }
 
+# Parsing variables defined as script options
+function parseVariables() {
+  PARSED_VARIABLES=0
+  while [ $# -gt 0 ] && [[ "$1" =~ ^-D ]]; do
+    [ "$DEBUG" = true ] || [ "$debug" = true ] && echo "parsing $1"
+    VAR=${1#-D}
+    VAR=`echo $VAR | sed 's/\./_/g'`
+    eval $VAR
+    shift
+    PARSED_VARIABLES=$(($PARSED_VARIABLES+1))
+  done
+}
+
 # Loading file with augeas rules and running evaluation over the file
 # to inject values of bash variables defined by script or script parameters
 function evalAugeas() {
@@ -54,6 +67,11 @@ function evalAugeas() {
 # -----------------------------------------------
 # ---------------- SCRIPT ITSELF ----------------
 # -----------------------------------------------
+# Taking off variables defined right after the script name
+# variable means '-Dname=value'
+parseVariables "$@"
+shift $PARSED_VARIABLES
+
 # Printing help
 [[ "$*" =~ -[-]{0,1}(h|help)( |$) ]] && usage && exit
 [ $# -eq 0 ] && usage && echo " -> No arguments defined" && exit
@@ -81,12 +99,9 @@ if [ -f "$VARIABLESFILE" ]; then
 fi
 
 # Parsing variables defined as script options
-while [ $# -gt 0 ]; do
-  VAR=${1#-D}
-  VAR=`echo $VAR | sed 's/\./_/g'`
-  eval $VAR
-  shift
-done
+# variable means '-Dname=value'
+parseVariables "$@"
+shift $PARSED_VARIABLES
 
 # Injecting data from augeas rule file to TEMPLATE var
 # simple way: TEMPLATE=`eval "echo \"$(cat \"$AUGEASFILE\")\""`
